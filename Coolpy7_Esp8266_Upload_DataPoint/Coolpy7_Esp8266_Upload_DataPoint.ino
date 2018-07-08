@@ -1,3 +1,4 @@
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <MQTT.h>
 
@@ -23,25 +24,14 @@ void connect() {
   }
 
   Serial.println("\nconnected!");
-
-  client.subscribe("/hello");
-  // client.unsubscribe("/hello");
-}
-
-void messageReceived(String &topic, String &payload) {
-  Serial.println("incoming: " + topic + " - " + payload);
 }
 
 void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, pass);
 
-  // Note: Local domain names (e.g. "Computer.local" on OSX) are not supported by Arduino.
-  // You need to set the IP address directly.
-  //
-  // MQTT brokers usually use port 8883 for secure connections.
-  client.begin("broker.shiftr.io", 8883, net);
-  client.onMessage(messageReceived);
+  // MQTT brokers usually use port 8443 for secure connections.
+  client.begin("192.168.31.84", 8443, net);
 
   connect();
 }
@@ -54,9 +44,21 @@ void loop() {
     connect();
   }
 
-  // publish a message roughly every second.
-  if (millis() - lastMillis > 3000) {
+  // publish a message roughly every 3 second.
+  if (millis() - lastMillis > 30000) {
     lastMillis = millis();
-    client.publish("/hello", "world");
+
+    //上传数据到Mongodb数据库
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject& root = jsonBuffer.createObject();
+    root["db_name"] = String("uploads");//coolpy7 dbpoxy对应的数据库名
+    root["table_name"] = String("datapoints");//coolpy7 dbpoxy对应的数据表名
+    root["op_name"] = String("insert");//支持insert,update,delete,query等操作符
+    root["token"] = String("password");
+    root["value"] = RawJson("{\"dp\":10.12}"); //准备上传的数据结点值，假设实际应用时上传温湿度值使用此项上传
+    String output;
+    root.printTo(output);
+
+    client.publish("dbpoxy/mongodb/get", output.c_str());
   }
 }
