@@ -2,8 +2,8 @@
 #include <ESP8266WiFi.h>
 #include <MQTT.h>
 
-const char ssid[] = "Xiaomi_1111";
-const char pass[] = "20001937";
+const char ssid[] = "Xiaomi_1111"; //wifi信号名
+const char pass[] = "20001937"; //wifi密码
 
 WiFiClientSecure net;
 MQTTClient client;
@@ -30,7 +30,7 @@ void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, pass);
 
-  // MQTT brokers usually use port 8443 for secure connections.
+  // 连接到Coolpy7服务器使用Tls安全通信通道
   client.begin("192.168.31.84", 8443, net);
 
   connect();
@@ -44,7 +44,7 @@ void loop() {
     connect();
   }
 
-  // publish a message roughly every 3 second.
+  // 每30秒发送一次数据结点
   if (millis() - lastMillis > 30000) {
     lastMillis = millis();
 
@@ -58,7 +58,7 @@ void loop() {
     root["value"] = RawJson("{\"dp\":10.12}"); //准备上传的数据结点值，假设实际应用时上传温湿度值使用此项上传
     String output;
     root.printTo(output);
-
+    //执行发送指令到Coolpy7
     client.publish("dbpoxy/mongodb/get", output.c_str());
   }
 }
