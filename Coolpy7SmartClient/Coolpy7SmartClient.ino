@@ -92,7 +92,7 @@ void setup() {
   }
 }
 
-
+  
 void smartConfig()
 {
   WiFi.mode(WIFI_STA);
@@ -128,22 +128,24 @@ void loop() {
         incomingPacket[len] = 0;
       }
       IPAddress rip = Udp.remoteIP();
-      DynamicJsonBuffer jsonBuffer;
-      JsonObject& root = jsonBuffer.parseObject(incomingPacket);
-      if (!root.success()) {
-        Serial.println("parseObject() failed");
+      DynamicJsonDocument doc(4096);
+      // Deserialize the JSON document
+      DeserializationError error = deserializeJson(doc, incomingPacket);
+      // Test if parsing succeeds.
+      if (error) {
+        Serial.print(F("deserializeJson() failed: "));
         return;
       }
       eepWrite(SvIpoffset, rip.toString());
-      const char* tcp = root["tcp"];
+      const char* tcp = doc["tcp"];
       eepWrite(SvTcpoffset, String(tcp));
-      const char* tls = root["tls"];
+      const char* tls = doc["tls"];
       eepWrite(SvTlsoffset, String(tls));
-      const char* ag = root["ag"];
+      const char* ag = doc["ag"];
       eepWrite(SvAgoffset, String(ag));
       EEPROM.write(hasSvoffset, 1);
       EEPROM.commit();
-      const char* v = root["v"];
+      const char* v = doc["v"];
       Serial.printf("ip: %s v: %s\n", rip.toString().c_str(), v);
       delay(1000);
       //启动系统
@@ -167,15 +169,14 @@ void reconnect() {
     if (EEPROM.read(reg) == 0) {
       if (client.connect(pid.c_str(), pid.c_str(), "Coolpy6@2017")) {
         //发送待注册设备信息到服务器
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& root = jsonBuffer.createObject();
-        //root["mac"] = WiFi.macAddress();
-        root["pid"] = pid;
-        //root["dtype"] = 1;//1开关，2可调值控制器，3自定义指令控制器，4数值传感器，5GPS传感器，6图片传感器，7自定义数据传感器
-        root["cb"] = subRegAddr;
-        root["uiid"] = 1;//界面id，当应用被发布到平台即可指定ui操作 0为禁用值
+        DynamicJsonDocument doc(4096);
+        //doc["mac"] = WiFi.macAddress();
+        doc["pid"] = pid;
+        //doc["dtype"] = 1;//1开关，2可调值控制器，3自定义指令控制器，4数值传感器，5GPS传感器，6图片传感器，7自定义数据传感器
+        doc["cb"] = subRegAddr;
+        doc["uiid"] = 1;//界面id，当应用被发布到平台即可指定ui操作 0为禁用值
         String output;
-        root.printTo(output);
+        serializeJson(doc, output);
         client.publish("$SYS/v1/http/post/m/reg", output.c_str());
         client.subscribe(subRegAddr.c_str(), 0);
         Serial.println("reg on");
@@ -198,13 +199,15 @@ void reconnect() {
 
 void callback(char* topic, byte* payload, unsigned int length) {
   if (String(topic) == subRegAddr) {
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject& root = jsonBuffer.parseObject(payload);
-    if (!root.success()) {
-      Serial.println("parseObject() failed");
+    DynamicJsonDocument doc(4096);
+    // Deserialize the JSON document
+    DeserializationError error = deserializeJson(doc, payload);
+    // Test if parsing succeeds.
+    if (error) {
+      Serial.print(F("deserializeJson() failed: "));
       return;
     }
-    const char* Chipid = root["Pid"];
+    const char* Chipid = doc["Pid"];
     Serial.println(Chipid);
   }
   //if (payload[0] == (byte)'y') {
